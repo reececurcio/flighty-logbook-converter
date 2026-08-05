@@ -36,3 +36,13 @@ manifest.webmanifest    Home Screen app settings
 service-worker.js       Caches the app shell
 icon.svg                Home Screen icon
 SAMPLE-FlightyExport.csv Test file
+
+
+VERSION 2.0 UTC FIX
+-------------------
+This version uses Luxon for airport-local to UTC conversion and refreshes the service-worker cache.
+After uploading the updated files, remove the old Home Screen icon, open the site in Safari, refresh once, and add it to the Home Screen again. Confirm the header says VERSION 2.0 UTC FIX.
+
+CHANGING THE APP ICON
+---------------------
+Replace icon.svg with your own icon using the same filename, or update index.html and manifest.webmanifest to point to a PNG. A 1024 x 1024 PNG is recommended for iPhone. After changing it, remove and re-add the Home Screen app so iOS refreshes the icon.

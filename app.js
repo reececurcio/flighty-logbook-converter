@@ -91,6 +91,7 @@ function assertLibraries() {
   if (!window.Papa) throw new Error('CSV library did not load. Check your internet connection and reopen the app.');
   if (!window.SunCalc) throw new Error('Sunset library did not load. Check your internet connection and reopen the app.');
   if (!window.ExcelJS) throw new Error('Excel export library did not load. Check your internet connection and reopen the app.');
+  if (!window.luxon?.DateTime) throw new Error('UTC conversion library did not load. Check your internet connection and reopen the app.');
   if (!getTzLookup()) throw new Error('Time-zone library did not load. Check your internet connection and reopen the app.');
 }
 function getTzLookup() {
@@ -174,23 +175,24 @@ function processFlight(raw, role, nightOffsetMin, useDiversion) {
   };
 }
 
-function parseNaive(value) {
-  if (!value) return null;
-  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!m) return null;
-  return {y:+m[1],mo:+m[2],d:+m[3],h:+m[4],mi:+m[5],s:+(m[6]||0)};
-}
 function zonedLocalToUtc(value, timeZone) {
-  const p = parseNaive(value); if (!p) return null;
-  const desired = Date.UTC(p.y,p.mo-1,p.d,p.h,p.mi,p.s);
-  let guess = desired;
-  for (let i=0;i<4;i++) {
-    const parts = new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(guess));
-    const o = Object.fromEntries(parts.filter(x=>x.type!=='literal').map(x=>[x.type,+x.value]));
-    const observed = Date.UTC(o.year,o.month-1,o.day,o.hour,o.minute,o.second);
-    guess += desired - observed;
+  if (!value) return null;
+  const text = String(value).trim();
+  const DateTime = window.luxon?.DateTime;
+  if (!DateTime) throw new Error('UTC conversion library is unavailable.');
+
+  // Flighty exports airport-local timestamps without an offset. Interpret the
+  // wall-clock value in that airport's IANA time zone, then convert to UTC.
+  // If a future Flighty export includes Z or an explicit offset, preserve it.
+  const hasExplicitOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text);
+  let dt = hasExplicitOffset
+    ? DateTime.fromISO(text, {setZone:true})
+    : DateTime.fromISO(text, {zone:timeZone, setZone:true});
+
+  if (!dt.isValid) {
+    throw new Error(`Could not interpret timestamp "${text}" in ${timeZone}: ${dt.invalidExplanation || dt.invalidReason}`);
   }
-  return new Date(guess);
+  return dt.toUTC().toJSDate();
 }
 
 function calculateNightMinutes(start, end, dep, arr, offsetMin) {
